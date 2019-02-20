@@ -214,10 +214,12 @@ pub fn request(pool: &str, port: u32) -> io::Result<u32> {
 
     let mut buf: RawNtpPacket = RawNtpPacket::default();
     let response = socket.recv_from(buf.0.as_mut())?;
+    let resp_arrive_timestamp = get_ntp_timestamp();
     dbg!(response.0);
+    dbg!(resp_arrive_timestamp);
 
     if response.0 == mem::size_of::<NtpPacket>() {
-        let result = process_response(buf);
+        let result = process_response(buf, resp_arrive_timestamp);
 
         match result {
             Ok(timestamp) => return Ok(timestamp),
