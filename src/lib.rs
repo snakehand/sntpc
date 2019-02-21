@@ -245,11 +245,19 @@ fn send_request(
     socket.send_to(&buf.0, dest)
 }
 
-fn process_response(resp: RawNtpPacket) -> Result<u32, &'static str> {
-    let mut packet = NtpPacket::from(resp);
-
-    convert_from_network(&mut packet);
-
+fn process_response(
+    resp: RawNtpPacket,
+    recv_timestamp: u64,
+) -> Result<u32, &'static str> {
+    let packet = NtpPacket::from(resp);
+    //    theta = T(B) - T(A) = 1/2 * [(T2-T1) + (T3-T4)]
+    //    and the round-trip delay
+    //    delta = T(ABA) = (T4-T1) - (T3-T2).
+    //    where:
+    //      - T1 = client's TX timestamp
+    //      - T2 = server's RX timestamp
+    //      - T3 = server's TX timestamp
+    //      - T4 = client's RX timestamp
     if packet.li_vn_mode == 0 || packet.stratum == 0 {
         return Err("Incorrect LI_VN_MODE or STRATUM headers");
     }
@@ -264,6 +272,16 @@ fn process_response(resp: RawNtpPacket) -> Result<u32, &'static str> {
 
     #[cfg(debug_assertions)]
     debug_ntp_packet(&packet);
+
+    let delta = (recv_timestamp - packet.origin_timestamp) as i64
+        - (packet.tx_timestamp - packet.recv_timestamp) as i64;
+    let theta = ((packet.recv_timestamp as i64
+        - packet.origin_timestamp as i64)
+        + (recv_timestamp as i64 - packet.tx_timestamp as i64))
+        / 2;
+
+    println!("Roundtrip delay: {} us", delta.abs());
+    println!("Offset: {} us", theta);
 
     let seconds = (packet.tx_timestamp >> 32) as u32;
     let tx_tm = seconds - NtpPacket::NTP_TIMESTAMP_DELTA;
