@@ -335,3 +335,15 @@ fn debug_ntp_packet(packet: &NtpPacket) {
     println!("| Transmit timestamp:\t{:>16}", packet.tx_timestamp);
     println!("{}", (0..52).map(|_| "=").collect::<String>());
 }
+
+fn get_ntp_timestamp() -> u64 {
+    let now_since_unix = time::SystemTime::now()
+        .duration_since(time::SystemTime::UNIX_EPOCH)
+        .unwrap();
+    let timestamp = ((now_since_unix.as_secs()
+        + (u64::from(NtpPacket::NTP_TIMESTAMP_DELTA)))
+        << 32)
+        + u64::from(now_since_unix.subsec_micros());
+
+    timestamp
+}
